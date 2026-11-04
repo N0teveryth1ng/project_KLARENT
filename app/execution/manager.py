@@ -9,12 +9,16 @@ from app.models.step_execution import StepExecution
 from app.models.scenario import Scenario
 from app.execution.executor import StepExecutor
 from app.browser.controller import BrowserController
+from app.failure_injection.injector import FailureInjector
+from app.recovery.retry_manager import RetryManager
+from app.idempotency.manager import IdempotencyManager
 from app.core.logging import logger
 
 
 class TestRunManager:
     def __init__(self, db: Session):
         self.db = db
+        self.retry_manager = RetryManager()
     
     async def create_run(self, scenario_id: uuid.UUID, environment: str = "default") -> TestRun:
         scenario = self.db.query(Scenario).filter(Scenario.id == scenario_id).first()
@@ -26,7 +30,7 @@ class TestRunManager:
             status="PENDING",
             environment=environment,
             total_steps=len(scenario.configuration.get("steps", [])),
-            metadata={}
+            run_metadata={}
         )
         self.db.add(run)
         self.db.commit()
@@ -34,24 +38,43 @@ class TestRunManager:
         logger.info("Test run created", run_id=str(run.id))
         return run
     
-    async def execute_run(self, run_id: uuid.UUID):
+    async def execute_run(self, run_id: uuid.UUID, resume: bool = False):
         run = self.db.query(TestRun).filter(TestRun.id == run_id).first()
         scenario = self.db.query(Scenario).filter(Scenario.id == run.scenario_id).first()
         
         run.status = "RUNNING"
-        run.started_at = datetime.utcnow()
+        if not run.started_at:
+            run.started_at = datetime.utcnow()
         self.db.commit()
         
         browser = BrowserController()
+        failure_injector = FailureInjector(scenario.configuration)
+        idem_manager = IdempotencyManager(self.db)
+        
         try:
             await browser.start()
             executor = StepExecutor(browser)
             
             steps = scenario.configuration.get("steps", [])
+            completed_step_ids = []
+            
+            if resume:
+                completed = self.db.query(StepExecution).filter(
+                    StepExecution.run_id == run.id,
+                    StepExecution.status == "PASSED"
+                ).all()
+                completed_step_ids = [s.step_id for s in completed]
+                logger.info("Resuming, skipping completed steps", count=len(completed_step_ids))
+            
             for step_config in steps:
+                step_id = step_config["step_id"]
+                if resume and step_id in completed_step_ids:
+                    logger.info("Skipping already completed step", step_id=step_id)
+                    continue
+                
                 step_exec = StepExecution(
                     run_id=run.id,
-                    step_id=step_config["step_id"],
+                    step_id=step_id,
                     status="RUNNING",
                     attempt_number=1,
                     started_at=datetime.utcnow()
@@ -59,18 +82,65 @@ class TestRunManager:
                 self.db.add(step_exec)
                 self.db.commit()
                 
-                result = await executor.execute_step(step_config)
-                
-                if result["status"] == "success":
-                    step_exec.status = "PASSED"
-                    if "screenshot_path" in result:
-                        step_exec.screenshot_path = result["screenshot_path"]
-                else:
+                try:
+                    # Check for side effects (idempotency)
+                    skip, ledger = idem_manager.check_action(str(run.id), step_id)
+                    if skip and ledger:
+                        logger.info("Skipping due to existing side effect", step_id=step_id)
+                        step_exec.status = "PASSED"
+                        step_exec.verification_result = {"skipped": True, "reason": "side_effect_exists"}
+                        step_exec.completed_at = datetime.utcnow()
+                        self.db.commit()
+                        continue
+                    
+                    if ledger is None and step_config.get("action_type") in ["click"]:  # side-effecting actions
+                        if "order" in step_id.lower() or "submit" in step_id.lower():
+                            ledger = idem_manager.create_action(str(run.id), step_id, step_config.get("action_type"))
+                    
+                    # Inject failure if configured
+                    try:
+                        await failure_injector.inject(step_id, {"run_id": str(run.id)})
+                    except Exception as fe:
+                        logger.warning("Failure injected", error=str(fe))
+                        raise
+                    
+                    # Execute with retry
+                    if ledger:
+                        idem_manager.mark_executing(ledger)
+                    
+                    async def execute():
+                        return await executor.execute_step(step_config)
+                    
+                    result = await self.retry_manager.retry_with_backoff(execute)
+                    
+                    if result["status"] == "success":
+                        step_exec.status = "PASSED"
+                        if "screenshot_path" in result:
+                            step_exec.screenshot_path = result["screenshot_path"]
+                        if ledger:
+                            idem_manager.mark_completed(ledger)
+                            idem_manager.mark_verified(ledger)
+                    else:
+                        step_exec.status = "FAILED"
+                        step_exec.error_message = result.get("error")
+                        run.status = "FAILED"
+                    
+                    step_exec.completed_at = datetime.utcnow()
+                    self.db.commit()
+                    
+                except Exception as e:
                     step_exec.status = "FAILED"
-                    step_exec.error_message = result.get("error")
-                
-                step_exec.completed_at = datetime.utcnow()
-                self.db.commit()
+                    step_exec.error_message = str(e)
+                    step_exec.error_type = type(e).__name__
+                    step_exec.completed_at = datetime.utcnow()
+                    self.db.commit()
+                    
+                    if self.retry_manager.is_retryable(e):
+                        run.status = "RETRYING"
+                    else:
+                        run.status = "FAILED"
+                    self.db.commit()
+                    raise
             
             # Check if all passed
             failed_steps = self.db.query(StepExecution).filter(
@@ -79,13 +149,22 @@ class TestRunManager:
             ).count()
             
             if failed_steps == 0:
-                run.status = "PASSED"
+                if resume:
+                    run.status = "RECOVERED"
+                else:
+                    run.status = "PASSED"
             else:
                 run.status = "FAILED"
             
             run.completed_at = datetime.utcnow()
             self.db.commit()
             
+        except Exception as e:
+            logger.error("Run execution failed", run_id=str(run.id), error=str(e))
+            if run.status not in ["FAILED", "RETRYING"]:
+                run.status = "FAILED"
+            run.completed_at = datetime.utcnow()
+            self.db.commit()
         finally:
             await browser.close()
         

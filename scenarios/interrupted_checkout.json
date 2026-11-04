@@ -1,0 +1,68 @@
+{
+  "name": "Interrupted Checkout",
+  "description": "Test recovery when order created but response lost",
+  "failure_injection": {
+    "type": "network_timeout",
+    "target_step": "submit_order",
+    "occurrence": 1
+  },
+  "steps": [
+    {
+      "step_id": "navigate_products",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/products"
+    },
+    {
+      "step_id": "login",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/login"
+    },
+    {
+      "step_id": "fill_creds",
+      "action_type": "fill",
+      "target": "input[name='username']",
+      "input_data": {"value": "testuser"}
+    },
+    {
+      "step_id": "fill_pass",
+      "action_type": "fill",
+      "target": "input[name='password']",
+      "input_data": {"value": "testpass"}
+    },
+    {
+      "step_id": "login_submit",
+      "action_type": "click",
+      "target": "button[type='submit']"
+    },
+    {
+      "step_id": "wait1",
+      "action_type": "wait",
+      "input_data": {"ms": 1000}
+    },
+    {
+      "step_id": "add_laptop",
+      "action_type": "click",
+      "target": ".product form button[type='submit']"
+    },
+    {
+      "step_id": "wait2",
+      "action_type": "wait",
+      "input_data": {"ms": 1000}
+    },
+    {
+      "step_id": "goto_checkout",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/checkout"
+    },
+    {
+      "step_id": "submit_order",
+      "action_type": "click",
+      "target": "#checkoutForm button[type='submit']"
+    },
+    {
+      "step_id": "wait3",
+      "action_type": "wait",
+      "input_data": {"ms": 2000}
+    }
+  ]
+}
