@@ -16,7 +16,7 @@
 <script>
 document.getElementById('checkoutForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = window.__IDEMPOTENCY_KEY__ || localStorage.getItem('__IDEMPOTENCY_KEY__') || crypto.randomUUID();
     const response = await fetch('/demo/checkout/submit', {
         method: 'POST',
         headers: {

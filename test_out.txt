@@ -1,0 +1,288 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0
+Using --randomly-seed=3705136835
+rootdir: D:\klarent demo
+configfile: pyproject.toml
+plugins: anyio-4.14.0, braintrust-0.44.0, hypothesis-6.168.3, langsmith-0.10.1, cov-7.1.0, randomly-5.0.0, socket-0.8.1
+collected 1 item
+
+tests\integration\test_lost_response_recovery.py F                       [100%]
+
+================================== FAILURES ===================================
+______ test_checkout_commits_response_lost_recovery_finds_original_order ______
+
+self = <sqlalchemy.engine.base.Connection object at 0x000001D3625B0D50>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001D360861690>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001D3625B0ED0>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x000001D3625B0F10>
+parameters = [('a08bf582-5646-412c-805e-1eeadf4a7c56',)]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:1969: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001D360861690>
+cursor = <sqlite3.Cursor object at 0x000001D36258ADC0>
+statement = 'SELECT test_runs.id AS test_runs_id, test_runs.scenario_id AS test_runs_scenario_id, test_runs.status AS test_runs_st...ted_at AS test_runs_created_at, test_runs.updated_at AS test_runs_updated_at \nFROM test_runs \nWHERE test_runs.id = ?'
+parameters = ('a08bf582-5646-412c-805e-1eeadf4a7c56',)
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001D3625B0ED0>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: no such column: test_runs.metadata
+
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\default.py:952: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+    def test_checkout_commits_response_lost_recovery_finds_original_order():
+        db = SessionLocal()
+        try:
+            db.query(CartItem).delete()
+            db.query(Order).delete()
+            db.query(Product).delete()
+            db.query(User).delete()
+            db.query(TestRun).delete()
+            db.query(Scenario).delete()
+            db.commit()
+    
+            user = User(id=uuid.uuid4(), username="testuser", email="test@test.com", password_hash="hash")
+            db.add(user)
+            product = Product(id=uuid.uuid4(), name="Laptop", description="test", price=999.99, stock=10)
+            db.add(product)
+            db.commit()
+            db.refresh(user)
+            db.refresh(product)
+    
+            cart = CartItem(id=uuid.uuid4(), user_id=user.id, product_id=product.id, quantity=1)
+            db.add(cart)
+            db.commit()
+            user_id = str(user.id)
+    
+            # Create scenario
+            scenario = Scenario(
+                id=uuid.uuid4(),
+                name="lost_response_test",
+                description="test",
+                configuration={
+                    "steps": [
+                        {"step_id": "submit_order", "action_type": "click", "target": "#checkoutForm button[type='submit']"}
+                    ],
+                    "failure_injection": {
+                        "type": "lost_response_after_commit",
+                        "target_step": "submit_order",
+                        "occurrence": 1
+                    }
+                }
+            )
+            db.add(scenario)
+            db.commit()
+            scenario_id = scenario.id
+        finally:
+            db.close()
+    
+        key = "LOST-" + str(uuid.uuid4())
+        db2 = SessionLocal()
+        try:
+            from app.idempotency.manager import IdempotencyManager
+            idem = IdempotencyManager(db2)
+            run = TestRun(id=uuid.uuid4(), scenario_id=scenario_id, status="RUNNING", total_steps=1)
+            db2.add(run)
+            db2.commit()
+>           ledger = idem.create_action(str(run.id), "submit_order", "click")
+                                            ^^^^^^
+
+tests\integration\test_lost_response_recovery.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\attributes.py:569: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\attributes.py:1096: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\attributes.py:1126: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\state.py:828: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\loading.py:1674: in load_scalar_attributes
+    result = load_on_ident(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\loading.py:510: in load_on_ident
+    return load_on_pk_identity(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\loading.py:695: in load_on_pk_identity
+    session.execute(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\session.py:2373: in execute
+    return self._execute_internal(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\session.py:2271: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\orm\context.py:306: in orm_execute_statement
+    result = conn.execute(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:1421: in execute
+    return meth(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:1643: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:2365: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001D360861690>
+cursor = <sqlite3.Cursor object at 0x000001D36258ADC0>
+statement = 'SELECT test_runs.id AS test_runs_id, test_runs.scenario_id AS test_runs_scenario_id, test_runs.status AS test_runs_st...ted_at AS test_runs_created_at, test_runs.updated_at AS test_runs_updated_at \nFROM test_runs \nWHERE test_runs.id = ?'
+parameters = ('a08bf582-5646-412c-805e-1eeadf4a7c56',)
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001D3625B0ED0>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: test_runs.metadata
+E       [SQL: SELECT test_runs.id AS test_runs_id, test_runs.scenario_id AS test_runs_scenario_id, test_runs.status AS test_runs_status, test_runs.environment AS test_runs_environment, test_runs.total_steps AS test_runs_total_steps, test_runs.started_at AS test_runs_started_at, test_runs.completed_at AS test_runs_completed_at, test_runs.worker_id AS test_runs_worker_id, test_runs.metadata AS test_runs_metadata, test_runs.created_at AS test_runs_created_at, test_runs.updated_at AS test_runs_updated_at 
+E       FROM test_runs 
+E       WHERE test_runs.id = ?]
+E       [parameters: ('a08bf582-5646-412c-805e-1eeadf4a7c56',)]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\sqlalchemy\engine\default.py:952: OperationalError
+============================== warnings summary ===============================
+app\schemas\scenario.py:25
+  D:\klarent demo\app\schemas\scenario.py:25: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ScenarioResponse(BaseModel):
+
+app\schemas\test_run.py:12
+  D:\klarent demo\app\schemas\test_run.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class TestRunResponse(BaseModel):
+
+app\models\test_run.py:11
+  D:\klarent demo\app\models\test_run.py:11: PytestCollectionWarning: cannot collect test class 'TestRun' because it has a __init__ constructor (from: tests/integration/test_lost_response_recovery.py)
+    class TestRun(Base):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_lost_response_recovery.py::test_checkout_commits_response_lost_recovery_finds_original_order
+======================== 1 failed, 3 warnings in 3.68s ========================

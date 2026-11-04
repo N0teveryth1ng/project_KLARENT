@@ -2,7 +2,7 @@
   "name": "Interrupted Checkout",
   "description": "Test recovery when order created but response lost",
   "failure_injection": {
-    "type": "network_timeout",
+    "type": "lost_response_after_commit",
     "target_step": "submit_order",
     "occurrence": 1
   },

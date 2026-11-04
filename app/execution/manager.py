@@ -92,14 +92,62 @@ class TestRunManager:
                         step_exec.completed_at = datetime.utcnow()
                         self.db.commit()
                         continue
+                    # If ledger exists but not completed (e.g., from crashed worker), reconcile
+                    if ledger and ledger.status in ["EXECUTING", "PENDING"]:
+                        if "order" in step_id.lower() or "submit" in step_id.lower() or "checkout" in step_id.lower():
+                            try:
+                                from app.database.session import SessionLocal
+                                from demo_app.models.order import Order
+                                demo_db = SessionLocal()
+                                try:
+                                    existing = demo_db.query(Order).filter(Order.idempotency_key == ledger.idempotency_key).first()
+                                    if existing:
+                                        logger.info("Reconciled existing order from crashed state", order_id=str(existing.id))
+                                        step_exec.status = "PASSED"
+                                        step_exec.verification_result = {"reconciled": True, "order_id": str(existing.id)}
+                                        step_exec.completed_at = datetime.utcnow()
+                                        self.db.commit()
+                                        ledger.external_reference = str(existing.id)
+                                        self.db.commit()
+                                        idem_manager.mark_completed(ledger)
+                                        idem_manager.mark_verified(ledger)
+                                        demo_db.close()
+                                        continue
+                                finally:
+                                    demo_db.close()
+                            except Exception as rex:
+                                logger.error("Reconciliation failed", error=str(rex))
                     
                     if ledger is None and step_config.get("action_type") in ["click"]:  # side-effecting actions
-                        if "order" in step_id.lower() or "submit" in step_id.lower():
+                        if "order" in step_id.lower() or "submit" in step_id.lower() or "checkout" in step_id.lower():
                             ledger = idem_manager.create_action(str(run.id), step_id, step_config.get("action_type"))
+                    
+                    # Inject idempotency key into page before checkout/submit
+                    try:
+                        if ledger and ("order" in step_id.lower() or "submit" in step_id.lower() or "checkout" in step_id.lower()):
+                            if browser.page:
+                                await browser.page.evaluate(f"window.__IDEMPOTENCY_KEY__ = '{ledger.idempotency_key}'; localStorage.setItem('__IDEMPOTENCY_KEY__', '{ledger.idempotency_key}');")
+                    except Exception as ke:
+                        logger.warning("Failed to inject idempotency key", error=str(ke))
+                    
+                    # Setup lost response after commit if needed
+                    failure_config = scenario.configuration.get("failure_injection", {})
+                    if failure_config.get("target_step") == step_id and failure_config.get("type") in ["lost_response", "lost_response_after_commit", "network_timeout"]:
+                        try:
+                            if browser.page and ledger:
+                                async def handle_route(route):
+                                    headers = dict(route.request.headers)
+                                    headers["x-fail-after-commit"] = "lost-response"
+                                    if ledger:
+                                        headers["idempotency-key"] = ledger.idempotency_key
+                                    await route.continue_(headers=headers)
+                                await browser.page.route("**/demo/checkout/submit", handle_route)
+                        except Exception as re:
+                            logger.warning("Failed to setup route interception", error=str(re))
                     
                     # Inject failure if configured
                     try:
-                        await failure_injector.inject(step_id, {"run_id": str(run.id)})
+                        await failure_injector.inject(step_id, {"run_id": str(run.id), "ledger": ledger, "idempotency_key": ledger.idempotency_key if ledger else None})
                     except Exception as fe:
                         logger.warning("Failure injected", error=str(fe))
                         raise
@@ -111,9 +159,37 @@ class TestRunManager:
                     async def execute():
                         return await executor.execute_step(step_config)
                     
-                    result = await self.retry_manager.retry_with_backoff(execute)
+                    try:
+                        result = await self.retry_manager.retry_with_backoff(execute)
+                    except Exception as ex:
+                        # Unknown outcome for side-effecting actions - try reconciliation
+                        if ledger and ("order" in step_id.lower() or "submit" in step_id.lower() or "checkout" in step_id.lower()):
+                            try:
+                                from app.recovery.orchestrator import RecoveryOrchestrator
+                                from demo_app.models.order import Order
+                                from app.database.session import SessionLocal
+                                demo_db = SessionLocal()
+                                try:
+                                    existing = demo_db.query(Order).filter(Order.idempotency_key == ledger.idempotency_key).first()
+                                    if existing:
+                                        logger.info("Reconciled: order exists after unknown outcome", order_id=str(existing.id))
+                                        step_exec.status = "PASSED"
+                                        step_exec.verification_result = {"reconciled": True, "order_id": str(existing.id), "order_number": existing.order_number}
+                                        step_exec.completed_at = datetime.utcnow()
+                                        self.db.commit()
+                                        if ledger:
+                                            ledger.external_reference = str(existing.id)
+                                            self.db.commit()
+                                            idem_manager.mark_completed(ledger)
+                                            idem_manager.mark_verified(ledger)
+                                        continue  # Move to next step
+                                finally:
+                                    demo_db.close()
+                            except Exception as rex:
+                                logger.error("Reconciliation failed", error=str(rex))
+                        raise
                     
-                    if result["status"] == "success":
+                    if result.get("status") == "success":
                         step_exec.status = "PASSED"
                         if "screenshot_path" in result:
                             step_exec.screenshot_path = result["screenshot_path"]

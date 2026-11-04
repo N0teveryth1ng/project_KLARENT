@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 
 from app.core.logging import logger
 
@@ -9,8 +9,16 @@ class RetryManager:
         self.max_retries = max_retries
         self.backoff_base = backoff_base
     
-    def is_retryable(self, error: Exception) -> bool:
-        error_str = str(error).lower()
+    def is_retryable(self, error_or_msg) -> bool:
+        if isinstance(error_or_msg, Exception):
+            error_str = str(error_or_msg).lower()
+        elif isinstance(error_or_msg, str):
+            error_str = error_or_msg.lower()
+        elif isinstance(error_or_msg, dict):
+            error_str = str(error_or_msg.get('error', '')).lower()
+        else:
+            error_str = str(error_or_msg).lower()
+            
         retryable_patterns = [
             "timeout",
             "network",
@@ -40,11 +48,24 @@ class RetryManager:
         
         return False
     
-    async def retry_with_backoff(self, func, *args, **kwargs):
+    async def retry_with_backoff(self, func: Callable, *args, **kwargs):
         last_error = None
         for attempt in range(self.max_retries + 1):
             try:
                 result = await func(*args, **kwargs)
+                # Check if result indicates retryable failure
+                if isinstance(result, dict) and result.get('status') == 'failed':
+                    error_msg = result.get('error', '')
+                    if self.is_retryable(error_msg):
+                        if attempt < self.max_retries:
+                            wait_time = self.backoff_base ** attempt
+                            logger.warning("Retrying after failed result", attempt=attempt + 1, wait_time=wait_time, error=error_msg)
+                            await asyncio.sleep(wait_time)
+                            continue
+                        else:
+                            raise Exception(error_msg)
+                    else:
+                        return result
                 if attempt > 0:
                     logger.info("Retry succeeded", attempt=attempt)
                 return result

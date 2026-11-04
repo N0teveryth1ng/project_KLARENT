@@ -2,17 +2,17 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, JSON, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database.base import Base
+from app.models.base_uuid import GUID
 
 
 class StepExecution(Base):
     __tablename__ = "step_executions"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("test_runs.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    run_id = Column(GUID(), ForeignKey("test_runs.id", ondelete="CASCADE"), nullable=False)
     step_id = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False)
     attempt_number = Column(Integer, default=1)
@@ -23,7 +23,7 @@ class StepExecution(Base):
     error_details = Column(JSON)
     verification_result = Column(JSON)
     screenshot_path = Column(String(512))
-    step_metadata = Column(JSON)
+    step_metadata = Column('metadata', JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

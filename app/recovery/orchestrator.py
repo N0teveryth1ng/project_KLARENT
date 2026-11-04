@@ -13,8 +13,16 @@ class RecoveryOrchestrator:
         self.db = db
         self.idem_manager = IdempotencyManager(db)
     
-    async def resume_run(self, run_id: str):
-        run = self.db.query(TestRun).filter(TestRun.id == run_id).first()
+    async def resume_run(self, run_id: str, lock: bool = True):
+        # Acquire lock to prevent concurrent recovery
+        if lock:
+            try:
+                run = self.db.query(TestRun).filter(TestRun.id == run_id).with_for_update(nowait=False).first()
+            except Exception:
+                run = self.db.query(TestRun).filter(TestRun.id == run_id).first()
+                raise
+        else:
+            run = self.db.query(TestRun).filter(TestRun.id == run_id).first()
         if not run:
             raise ValueError("Run not found")
         
@@ -29,8 +37,14 @@ class RecoveryOrchestrator:
         
         logger.info("Found completed steps", count=len(completed_step_ids))
         
+        # Load action records
+        action_records = self.db.query(ActionLedger).filter(ActionLedger.run_id == run_id).all()
+        for ledger in action_records:
+            logger.info("Found action ledger", step_id=ledger.step_id, key=ledger.idempotency_key, status=ledger.status)
+        
         # Mark as running again
         run.status = "RUNNING"
+        run.worker_id = run.worker_id or "recovered"
         self.db.commit()
         
         return run, completed_step_ids
@@ -51,3 +65,27 @@ class RecoveryOrchestrator:
         else:
             return None
         return order
+    
+    def find_incomplete_runs(self):
+        # Find runs that need recovery
+        incomplete = self.db.query(TestRun).filter(
+            TestRun.status.in_(["RUNNING", "RETRYING", "INTERRUPTED"])
+        ).all()
+        return incomplete
+    
+    async def recover_incomplete_runs(self, manager_class):
+        incomplete = self.find_incomplete_runs()
+        for run in incomplete:
+            try:
+                # Try to acquire lock
+                try:
+                    locked_run = self.db.query(TestRun).filter(TestRun.id == run.id).with_for_update(nowait=True).first()
+                    if not locked_run:
+                        continue
+                except Exception:
+                    continue  # Another worker has lock
+                await self.resume_run(str(run.id), lock=False)
+                manager = manager_class(self.db)
+                await manager.execute_run(run.id, resume=True)
+            except Exception as e:
+                logger.error("Failed to recover run", run_id=str(run.id), error=str(e))

@@ -7,7 +7,8 @@ class FailureInjector:
         self.config = config or {}
         self.injected = False
     
-    async def inject(self, step_id: str, context: Dict[str, Any]) -> bool:
+    async def inject(self, step_id: str, context: Dict[str, Any] = None) -> bool:
+        context = context or {}
         if self.injected:
             return False
         
@@ -17,7 +18,7 @@ class FailureInjector:
             logger.warning("Injecting failure", step_id=step_id, failure_type=failure_type)
             self.injected = True
             
-            if failure_type == "network_timeout":
+            if failure_type == "network_timeout" or failure_type == "lost_response" or failure_type == "lost_response_after_commit":
                 raise TimeoutError("Simulated network timeout")
             elif failure_type == "browser_crash":
                 raise Exception("Simulated browser crash")

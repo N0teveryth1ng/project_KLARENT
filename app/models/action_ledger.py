@@ -2,17 +2,17 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, JSON, Boolean
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database.base import Base
+from app.models.base_uuid import GUID
 
 
 class ActionLedger(Base):
     __tablename__ = "action_ledger"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("test_runs.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    run_id = Column(GUID(), ForeignKey("test_runs.id", ondelete="CASCADE"), nullable=False)
     step_id = Column(String(255), nullable=False)
     idempotency_key = Column(String(255), nullable=False, unique=True)
     action_type = Column(String(100), nullable=False)

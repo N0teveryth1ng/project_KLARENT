@@ -1,0 +1,116 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0
+Using --randomly-seed=2045416063
+rootdir: D:\klarent demo
+configfile: pyproject.toml
+plugins: anyio-4.14.0, braintrust-0.44.0, hypothesis-6.168.3, langsmith-0.10.1, cov-7.1.0, randomly-5.0.0, socket-0.8.1
+collected 1 item
+
+tests\integration\test_worker_restart_recovery.py F                      [100%]
+
+================================== FAILURES ===================================
+_____ test_worker_process_restart_recovers_interrupted_checkout_postgres ______
+
+    def test_worker_process_restart_recovers_interrupted_checkout_postgres():
+        # Use PostgreSQL URL if available, otherwise skip or use configured
+        db_url = os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL')
+        # Try to use postgres if possible
+        db = SessionLocal()
+        try:
+            # Clean up
+            db.query(ActionLedger).delete()
+            db.query(StepExecution).delete()
+            db.query(TestRun).delete()
+            db.query(Scenario).delete()
+            db.query(CartItem).delete()
+            db.query(Order).delete()
+            db.query(Product).delete()
+            db.query(User).delete()
+            db.commit()
+    
+            user = User(id=uuid.uuid4(), username="testuser", email="test@test.com", password_hash="hash")
+            db.add(user)
+            product = Product(id=uuid.uuid4(), name="Laptop", description="test", price=999.99, stock=10)
+            db.add(product)
+            db.commit()
+    
+            # Create scenario for interrupted checkout
+            scenario = Scenario(
+                id=uuid.uuid4(),
+                name="interrupted_checkout_restart",
+                description="test",
+                configuration={
+                    "steps": [
+                        {"step_id": "submit_order", "action_type": "click", "target": "#checkoutForm button[type='submit']"}
+                    ],
+                    "failure_injection": {
+                        "type": "lost_response_after_commit",
+                        "target_step": "submit_order",
+                        "occurrence": 1
+                    }
+                }
+            )
+            db.add(scenario)
+            db.commit()
+    
+            run = TestRun(id=uuid.uuid4(), scenario_id=scenario.id, status="RUNNING", total_steps=1)
+            db.add(run)
+            db.commit()
+    
+            from app.idempotency.manager import IdempotencyManager
+            idem = IdempotencyManager(db)
+            key = "LOST-RESTART-" + str(uuid.uuid4())
+            ledger = idem.create_action(str(run.id), "submit_order", "click")
+            ledger.idempotency_key = key
+            ledger.status = "EXECUTING"
+            db.commit()
+    
+            run_id = str(run.id)
+            scenario_id = str(scenario.id)
+            key_val = key
+            user_id_str = str(user.id)
+        finally:
+            db.close()
+    
+        # Simulate: checkout creates order, response lost (order committed)
+        from fastapi.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+        client.cookies.set("user_id", user_id_str)
+        try:
+            resp = client.post("/demo/checkout/submit", headers={"Idempotency-Key": key_val, "X-Fail-After-Commit": "lost-response"}, timeout=1)
+        except Exception:
+            pass
+    
+        time.sleep(2)
+    
+        # Verify order created
+        db = SessionLocal()
+        try:
+            orders = db.query(Order).filter(Order.idempotency_key == key_val).all()
+>           assert len(orders) == 1
+E           assert 0 == 1
+E            +  where 0 = len([])
+
+tests\integration\test_worker_restart_recovery.py:94: AssertionError
+============================== warnings summary ===============================
+app\models\test_run.py:11
+  D:\klarent demo\app\models\test_run.py:11: PytestCollectionWarning: cannot collect test class 'TestRun' because it has a __init__ constructor (from: tests/integration/test_worker_restart_recovery.py)
+    class TestRun(Base):
+
+tests/integration/test_worker_restart_recovery.py::test_worker_process_restart_recovers_interrupted_checkout_postgres
+  D:\klarent demo\app\schemas\scenario.py:25: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ScenarioResponse(BaseModel):
+
+tests/integration/test_worker_restart_recovery.py::test_worker_process_restart_recovers_interrupted_checkout_postgres
+  D:\klarent demo\app\schemas\test_run.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class TestRunResponse(BaseModel):
+
+tests/integration/test_worker_restart_recovery.py::test_worker_process_restart_recovers_interrupted_checkout_postgres
+  C:\Users\S Das\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\starlette\testclient.py:439: DeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_worker_restart_recovery.py::test_worker_process_restart_recovers_interrupted_checkout_postgres
+======================== 1 failed, 4 warnings in 4.64s ========================

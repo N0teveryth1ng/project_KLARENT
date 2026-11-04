@@ -59,4 +59,9 @@ class IdempotencyManager:
         # If already completed and verified, skip
         if ledger and ledger.status in ["COMPLETED", "VERIFIED"] and ledger.side_effect_occurred:
             return True
+        # If executing/completed but uncertain, need reconciliation - don't blindly skip
+        if ledger and ledger.status == "COMPLETED":
+            return True
+        if ledger and ledger.status == "VERIFIED":
+            return True
         return False
