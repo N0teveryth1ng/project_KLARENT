@@ -1,0 +1,88 @@
+{
+  "name": "Product Purchase",
+  "description": "Login, find product, add to cart, checkout, verify order",
+  "steps": [
+    {
+      "step_id": "navigate_home",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/products"
+    },
+    {
+      "step_id": "go_to_login",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/login"
+    },
+    {
+      "step_id": "fill_username",
+      "action_type": "fill",
+      "target": "input[name='username']",
+      "input_data": {"value": "testuser"}
+    },
+    {
+      "step_id": "fill_password",
+      "action_type": "fill",
+      "target": "input[name='password']",
+      "input_data": {"value": "testpass"}
+    },
+    {
+      "step_id": "click_login",
+      "action_type": "click",
+      "target": "button[type='submit']"
+    },
+    {
+      "step_id": "wait_after_login",
+      "action_type": "wait",
+      "input_data": {"ms": 1000}
+    },
+    {
+      "step_id": "search_product",
+      "action_type": "fill",
+      "target": "input[name='search']",
+      "input_data": {"value": "Laptop"}
+    },
+    {
+      "step_id": "submit_search",
+      "action_type": "click",
+      "target": "form button[type='submit']"
+    },
+    {
+      "step_id": "wait_search",
+      "action_type": "wait",
+      "input_data": {"ms": 1000}
+    },
+    {
+      "step_id": "add_to_cart",
+      "action_type": "click",
+      "target": ".product form button[type='submit']"
+    },
+    {
+      "step_id": "wait_cart",
+      "action_type": "wait",
+      "input_data": {"ms": 1000}
+    },
+    {
+      "step_id": "go_to_cart",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/cart"
+    },
+    {
+      "step_id": "checkout",
+      "action_type": "navigate",
+      "target": "http://localhost:8000/demo/checkout"
+    },
+    {
+      "step_id": "submit_order",
+      "action_type": "click",
+      "target": "#checkoutForm button[type='submit']"
+    },
+    {
+      "step_id": "wait_order",
+      "action_type": "wait",
+      "input_data": {"ms": 2000}
+    },
+    {
+      "step_id": "screenshot_result",
+      "action_type": "screenshot"
+    }
+  ]
+}
