@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.api import health
 from app.core.config import settings
+from demo_app.routes import auth, products, cart, checkout, orders
 
 app = FastAPI(
     title=settings.app_name,
@@ -12,6 +13,11 @@ app = FastAPI(
 )
 
 app.include_router(health.router, tags=["health"])
+app.include_router(auth.router, prefix="/demo", tags=["demo-auth"])
+app.include_router(products.router, prefix="/demo/products", tags=["demo-products"])
+app.include_router(cart.router, prefix="/demo/cart", tags=["demo-cart"])
+app.include_router(checkout.router, prefix="/demo/checkout", tags=["demo-checkout"])
+app.include_router(orders.router, prefix="/demo/orders", tags=["demo-orders"])
 
 # Mount static files
 try:
@@ -26,4 +32,5 @@ def root():
         "message": "Agent Reliability Lab",
         "docs": "/docs",
         "health": "/health",
+        "demo": "/demo/products",
     }

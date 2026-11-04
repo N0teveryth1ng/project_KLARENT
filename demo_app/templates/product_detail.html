@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ product.name }}</h1>
+<p>{{ product.description }}</p>
+<p><strong>${{ product.price }}</strong></p>
+<p>Stock: {{ product.stock }}</p>
+<form method="post" action="/demo/cart/add">
+    <input type="hidden" name="product_id" value="{{ product.id }}">
+    <input type="number" name="quantity" value="1" min="1">
+    <button type="submit">Add to Cart</button>
+</form>
+<a href="/demo/products">Back to Products</a>
+{% endblock %}

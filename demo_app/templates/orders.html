@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>My Orders</h1>
+{% if orders %}
+{% for order in orders %}
+<div class="product">
+    <h3>Order {{ order.order_number }}</h3>
+    <p>Status: {{ order.status }}</p>
+    <p>Total: ${{ order.total_amount }}</p>
+    <p>Date: {{ order.created_at }}</p>
+</div>
+{% endfor %}
+{% else %}
+<p>No orders yet</p>
+{% endif %}
+{% endblock %}
