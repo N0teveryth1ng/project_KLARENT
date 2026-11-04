@@ -147,7 +147,12 @@ class TestRunManager:
                     
                     # Inject failure if configured
                     try:
-                        await failure_injector.inject(step_id, {"run_id": str(run.id), "ledger": ledger, "idempotency_key": ledger.idempotency_key if ledger else None})
+                        failure_config = scenario.configuration.get("failure_injection", {})
+                        if failure_config.get("target_step") == step_id and failure_config.get("type") in ["lost_response", "lost_response_after_commit"]:
+                            # For lost response after commit, let demo app handle it via headers/routes
+                            pass
+                        else:
+                            await failure_injector.inject(step_id, {"run_id": str(run.id), "ledger": ledger, "idempotency_key": ledger.idempotency_key if ledger else None})
                     except Exception as fe:
                         logger.warning("Failure injected", error=str(fe))
                         raise

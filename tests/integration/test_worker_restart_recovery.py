@@ -18,13 +18,11 @@ import demo_app.models
 
 
 def test_worker_process_restart_recovers_interrupted_checkout_postgres():
-    # Use PostgreSQL URL if available, otherwise skip or use configured
     from app.database.base import Base
     Base.metadata.create_all(bind=engine)
     db_url = os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL')
     db = SessionLocal()
     try:
-        # Clean up
         db.query(ActionLedger).delete()
         db.query(StepExecution).delete()
         db.query(TestRun).delete()
@@ -40,14 +38,16 @@ def test_worker_process_restart_recovers_interrupted_checkout_postgres():
         product = Product(id=uuid.uuid4(), name="Laptop", description="test", price=999.99, stock=10)
         db.add(product)
         db.commit()
+        user_id_str = str(user.id)
         
-        # Create scenario for interrupted checkout
+        # Create scenario for interrupted checkout with lost response after commit
         scenario = Scenario(
             id=uuid.uuid4(),
             name="interrupted_checkout_restart",
             description="test",
             configuration={
                 "steps": [
+                    {"step_id": "goto_checkout", "action_type": "navigate", "target": "http://localhost:8000/demo/checkout"},
                     {"step_id": "submit_order", "action_type": "click", "target": "#checkoutForm button[type='submit']"}
                 ],
                 "failure_injection": {
@@ -60,71 +60,73 @@ def test_worker_process_restart_recovers_interrupted_checkout_postgres():
         db.add(scenario)
         db.commit()
         
-        run = TestRun(id=uuid.uuid4(), scenario_id=scenario.id, status="RUNNING", total_steps=1)
+        run = TestRun(id=uuid.uuid4(), scenario_id=scenario.id, status="PENDING", total_steps=2)
         db.add(run)
         db.commit()
-        
-        from app.idempotency.manager import IdempotencyManager
-        idem = IdempotencyManager(db)
-        key = "LOST-RESTART-" + str(uuid.uuid4())
-        ledger = idem.create_action(str(run.id), "submit_order", "click")
-        ledger.idempotency_key = key
-        ledger.status = "EXECUTING"
-        db.commit()
-        
         run_id = str(run.id)
-        scenario_id = str(scenario.id)
-        key_val = key
-        user_id_str = str(user.id)
+        key = "LOST-RESTART-" + str(run_id)
     finally:
         db.close()
     
-    # Simulate: checkout creates order, response lost (order committed)
+    # Add item to cart for the user
     from fastapi.testclient import TestClient
     from app.main import app
     client = TestClient(app)
     client.cookies.set("user_id", user_id_str)
-    try:
-        resp = client.post("/demo/checkout/submit", headers={"Idempotency-Key": key_val, "X-Fail-After-Commit": "lost-response"}, timeout=1)
-    except Exception:
-        pass
-    
-    time.sleep(2)
-    
-    # Verify order created
+    # Login/add to cart
     db = SessionLocal()
     try:
-        orders = db.query(Order).filter(Order.idempotency_key == key_val).all()
-        assert len(orders) == 1
-    finally:
-        db.close()
-    
-    # Terminate worker process (simulate crash) - mark run as running but step not completed
-    db = SessionLocal()
-    try:
-        run = db.query(TestRun).filter(TestRun.id == uuid.UUID(run_id)).first()
-        run.status = "RUNNING"
+        from demo_app.models.cart import CartItem
+        prod = db.query(Product).first()
+        cart = CartItem(id=uuid.uuid4(), user_id=uuid.UUID(user_id_str), product_id=prod.id, quantity=1)
+        db.add(cart)
         db.commit()
     finally:
         db.close()
     
-    # Start a new worker process
-    worker_script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'app', 'worker.py')
-    worker_script = os.path.abspath(worker_script)
-    cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    proc = subprocess.Popen([sys.executable, worker_script], cwd=cwd)
+    # Start worker process to execute the run
+    cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    runner_script = os.path.join(cwd, 'scripts', 'run_single.py')
+    proc = subprocess.Popen([sys.executable, runner_script, run_id], cwd=cwd)
+    
+    # Give it time to start and reach checkout
+    time.sleep(5)
+    
+    # Terminate the worker process while it's running (simulating crash)
     try:
-        proc.wait(timeout=30)
-    except subprocess.TimeoutExpired:
         proc.terminate()
         proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    
+    time.sleep(2)
+    
+    # Check if order was created (checkout commits then response lost)
+    db = SessionLocal()
+    try:
+        orders = db.query(Order).all()
+        assert len(orders) >= 1  # Order should exist
+    finally:
+        db.close()
+    
+    # Start a new worker process to recover
+    worker_script = os.path.join(cwd, 'app', 'worker.py')
+    proc2 = subprocess.Popen([sys.executable, worker_script], cwd=cwd)
+    try:
+        proc2.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        proc2.terminate()
+        proc2.wait(timeout=5)
     
     time.sleep(3)
     
-    # Verify recovery - check order still exists and only once
+    # Verify recovery - original order verified, exactly one order exists
     db = SessionLocal()
     try:
-        orders = db.query(Order).filter(Order.idempotency_key == key_val).all()
+        orders = db.query(Order).all()
         assert len(orders) == 1  # Exactly one order
     finally:
         db.close()

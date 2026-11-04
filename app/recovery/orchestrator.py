@@ -17,10 +17,12 @@ class RecoveryOrchestrator:
         # Acquire lock to prevent concurrent recovery
         if lock:
             try:
-                run = self.db.query(TestRun).filter(TestRun.id == run_id).with_for_update(nowait=False).first()
+                run = self.db.query(TestRun).filter(TestRun.id == run_id).with_for_update(nowait=True).first()
             except Exception:
-                run = self.db.query(TestRun).filter(TestRun.id == run_id).first()
-                raise
+                try:
+                    run = self.db.query(TestRun).filter(TestRun.id == run_id).with_for_update().first()
+                except Exception:
+                    raise
         else:
             run = self.db.query(TestRun).filter(TestRun.id == run_id).first()
         if not run:
@@ -45,6 +47,7 @@ class RecoveryOrchestrator:
         # Mark as running again
         run.status = "RUNNING"
         run.worker_id = run.worker_id or "recovered"
+        self.db.flush()
         self.db.commit()
         
         return run, completed_step_ids
@@ -77,15 +80,31 @@ class RecoveryOrchestrator:
         incomplete = self.find_incomplete_runs()
         for run in incomplete:
             try:
-                # Try to acquire lock
+                # Try to acquire advisory lock to prevent concurrent recovery
                 try:
-                    locked_run = self.db.query(TestRun).filter(TestRun.id == run.id).with_for_update(nowait=True).first()
-                    if not locked_run:
-                        continue
+                    from sqlalchemy import text
+                    lock_id = hash(str(run.id)) & 0xFFFFFFFF
+                    result = self.db.execute(text(f"SELECT pg_advisory_lock({lock_id})"))
+                    self.db.commit()
                 except Exception:
-                    continue  # Another worker has lock
-                await self.resume_run(str(run.id), lock=False)
-                manager = manager_class(self.db)
-                await manager.execute_run(run.id, resume=True)
+                    # If not postgres or lock fails, try row lock
+                    try:
+                        locked_run = self.db.query(TestRun).filter(TestRun.id == run.id).with_for_update(nowait=True).first()
+                        if not locked_run:
+                            continue
+                    except Exception:
+                        continue
+                try:
+                    await self.resume_run(str(run.id), lock=False)
+                    manager = manager_class(self.db)
+                    await manager.execute_run(run.id, resume=True)
+                finally:
+                    try:
+                        from sqlalchemy import text
+                        lock_id = hash(str(run.id)) & 0xFFFFFFFF
+                        self.db.execute(text(f"SELECT pg_advisory_unlock({lock_id})"))
+                        self.db.commit()
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.error("Failed to recover run", run_id=str(run.id), error=str(e))

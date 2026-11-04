@@ -50,8 +50,15 @@ def submit_order(
                     orig_hash = hashlib.sha256(json.dumps(existing_order.items, sort_keys=True).encode()).hexdigest()
                     if current_hash != orig_hash:
                         return JSONResponse({"error": "Idempotency key reused with different payload"}, status_code=409)
+                    else:
+                        return JSONResponse({
+                            "order_id": str(existing_order.id),
+                            "order_number": existing_order.order_number,
+                            "status": existing_order.status,
+                            "message": "Order already exists"
+                        })
                 except Exception:
-                    pass
+                    return JSONResponse({"error": "Idempotency key reused with different payload"}, status_code=409)
             return JSONResponse({
                 "order_id": str(existing_order.id),
                 "order_number": existing_order.order_number,
@@ -99,14 +106,15 @@ def submit_order(
                     existing_payload_hash = hashlib.sha256(json.dumps(existing_order.items, sort_keys=True).encode()).hexdigest()
                     if payload_hash and existing_payload_hash != payload_hash:
                         return JSONResponse({"error": "Idempotency key reused with different payload"}, status_code=409)
+                    else:
+                        return JSONResponse({
+                            "order_id": str(existing_order.id),
+                            "order_number": existing_order.order_number,
+                            "status": existing_order.status,
+                            "message": "Order already exists"
+                        })
                 except Exception:
-                    pass
-                return JSONResponse({
-                    "order_id": str(existing_order.id),
-                    "order_number": existing_order.order_number,
-                    "status": existing_order.status,
-                    "message": "Order already exists"
-                })
+                    return JSONResponse({"error": "Idempotency key reused with different payload"}, status_code=409)
         raise
     
     # Simulate lost response after commit
