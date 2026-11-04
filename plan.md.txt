@@ -1,0 +1,1119 @@
+# MASTER BUILD PROMPT — Agent QA Reliability & Recovery Platform
+
+## 1. Your role
+
+Act as a senior backend engineer, AI infrastructure engineer, QA automation architect and technical product builder.
+
+You are responsible for designing and implementing a production-minded engineering demonstration specifically aligned with the problems addressed by **Klarent (formerly ForeAI)**: autonomous software testing, AI-driven browser interactions, test execution, failure detection, recovery and trustworthy test results.
+
+This is not a generic CRUD application, a chatbot, a basic Playwright wrapper or a portfolio dashboard.
+
+Build a technically credible system that demonstrates an understanding of the difficult engineering problems behind autonomous QA agents.
+
+The project must be sufficiently polished to show to Klarent's CTO and engineering team as evidence of my ability to contribute to their product domain.
+
+Do not claim to reproduce Klarent's proprietary architecture or internal implementation. Build an original, independent demonstration based on publicly observable product problems.
+
+---
+
+# 2. Product definition
+
+**Working name: Agent Reliability Lab**
+
+### What it does
+
+Agent Reliability Lab is a web-based autonomous QA execution and evaluation platform.
+
+A user defines a browser-based testing scenario. The system executes that scenario against a controlled demo application, observes browser behaviour, verifies expected outcomes, handles failures, and produces an execution report.
+
+The platform should demonstrate that an autonomous QA system can do more than successfully execute a happy-path test.
+
+It must demonstrate that the system can:
+
+- Execute browser workflows reliably.
+- Detect unexpected application behaviour.
+- Identify failed execution steps.
+- Recover from transient failures.
+- Avoid repeating completed side effects.
+- Preserve execution state across interruptions.
+- Distinguish genuine failures from recoverable failures.
+- Produce evidence-backed test results.
+- Measure reliability across repeated executions.
+
+### Core engineering question
+
+Can an autonomous browser-testing system reliably complete a workflow when the browser, application or network behaves unpredictably?
+
+Every major engineering decision should contribute to answering this question.
+
+---
+
+# 3. Target use case
+
+Build around a realistic e-commerce web application.
+
+The application under test should support:
+
+1. User registration and login.
+2. Product browsing.
+3. Product search.
+4. Adding products to a cart.
+5. Checkout.
+6. Order creation.
+7. Viewing order history.
+
+The QA platform should independently execute workflows against this application.
+
+### Initial test scenarios
+
+Implement these scenarios:
+
+**Scenario A — User registration**
+- Open registration page.
+- Enter user details.
+- Submit registration.
+- Verify account creation.
+- Verify the user can log in.
+
+**Scenario B — Product purchase**
+- Log in.
+- Find a product.
+- Add it to the cart.
+- Proceed to checkout.
+- Submit the order.
+- Verify the order appears in order history.
+
+**Scenario C — Product search**
+- Search for a product.
+- Verify relevant results.
+- Test an empty search.
+- Test an invalid search query.
+
+**Scenario D — Interrupted checkout**
+- Execute checkout.
+- Interrupt execution after the order submission request.
+- Restart or resume execution.
+- Verify that the order is not created twice.
+
+**Scenario E — Browser recovery**
+- Start a workflow.
+- Introduce a browser timeout or temporary network failure.
+- Recover from the failure.
+- Verify that the workflow completes correctly.
+
+Do not build a large e-commerce application. Its purpose is to provide a controlled environment for demonstrating QA reliability.
+
+---
+
+# 4. Core system architecture
+
+Use a modular architecture.
+
+Preferred stack:
+
+| Component | Technology |
+|---|---|
+| Language | Python 3.12+ |
+| Backend | FastAPI |
+| Browser automation | Playwright |
+| Database | PostgreSQL |
+| Short-lived coordination | Redis |
+| ORM | SQLAlchemy 2.0 |
+| Migrations | Alembic |
+| Testing | Pytest |
+| Validation | Pydantic |
+| Frontend | Jinja2 + HTML/CSS + minimal JavaScript |
+| Infrastructure | Docker Compose |
+| API documentation | FastAPI OpenAPI |
+
+Avoid introducing unnecessary technologies.
+
+Do not use Kafka, Kubernetes, LangGraph or multiple microservices just to increase the technology count.
+
+Start with a modular monolith.
+
+### High-level architecture
+
+    Dashboard
+        |
+        v
+    FastAPI Application
+        |
+        v
+    Test Run Manager
+        |
+        v
+    Execution Engine
+        |
+        +---- Scenario Planner
+        |
+        +---- Playwright Browser Controller
+        |
+        +---- Step Executor
+        |
+        +---- Assertion Engine
+        |
+        +---- Retry and Recovery Manager
+        |
+        +---- Idempotency Manager
+        |
+        +---- Failure Injection
+        |
+        v
+    Execution State Manager
+        |
+        +---- PostgreSQL
+        |
+        +---- Redis
+        |
+        v
+    Evidence and Evaluation Engine
+        |
+        v
+    Results Dashboard
+
+Keep components independently testable.
+
+---
+
+# 5. Autonomous QA execution engine
+
+This is the core of the project.
+
+Build a step-based execution engine.
+
+A scenario consists of multiple ordered steps.
+
+Each step should contain:
+
+- Unique step ID.
+- Action type.
+- Target element or locator.
+- Input data, if required.
+- Expected outcome.
+- Timeout.
+- Retry policy.
+- Verification conditions.
+
+Example:
+
+    Scenario: Purchase a product
+
+    Step 1: Open application
+    Step 2: Log in
+    Step 3: Search for product
+    Step 4: Open product page
+    Step 5: Add product to cart
+    Step 6: Open checkout
+    Step 7: Submit order
+    Step 8: Verify order creation
+
+Implement reusable action types:
+
+- Navigate.
+- Click.
+- Fill.
+- Select.
+- Wait.
+- Assert visible.
+- Assert text.
+- Assert URL.
+- Screenshot.
+- Verify application state.
+
+The engine must not blindly assume an action succeeded because Playwright returned without throwing an exception.
+
+Every important action must have an explicit postcondition or verification strategy.
+
+Persist execution results after each step.
+
+### Execution states
+
+Use explicit states:
+
+- PENDING
+- RUNNING
+- PASSED
+- FAILED
+- RETRYING
+- RECOVERED
+- CANCELLED
+- INTERRUPTED
+
+Define valid state transitions.
+
+Do not allow arbitrary state changes.
+
+---
+
+# 6. Failure injection and resilience testing
+
+This is one of the most important parts.
+
+Create a controlled failure-injection framework.
+
+The system should support deliberate failures during execution.
+
+### Failure types
+
+**A. Browser failures**
+- Browser process termination.
+- Page crash.
+- Navigation timeout.
+- Element not found.
+- Stale or changed page state.
+
+**B. Network failures**
+- Temporary request timeout.
+- HTTP 500 response.
+- Connection interruption.
+- Slow response.
+- Request failure.
+
+**C. Application failures**
+- Unexpected validation error.
+- Failed API request.
+- Delayed application response.
+- Application state mismatch.
+
+**D. Execution failures**
+- Worker process termination.
+- Execution interruption between steps.
+- Restart after persisted state.
+- Duplicate execution request.
+
+Implement a failure-injection configuration per scenario.
+
+Example:
+
+    Scenario: Checkout recovery
+
+    Failure injection:
+        type: network_timeout
+        target_step: submit_order
+        occurrence: 1
+        duration: 3 seconds
+
+The framework should allow deterministic reproduction of failures.
+
+Never inject failures randomly by default. Reproducibility matters more than unpredictability.
+
+---
+
+# 7. Retry and recovery engine
+
+Implement controlled retry behaviour.
+
+Retries must be based on failure classification.
+
+### Retryable failures
+
+Examples:
+- Temporary network timeout.
+- Browser navigation timeout.
+- Temporary HTTP 5xx.
+- Browser process interruption where recovery is possible.
+
+### Non-retryable failures
+
+Examples:
+- Invalid user credentials.
+- Failed business assertion.
+- Missing required test data.
+- Invalid input.
+- Permanent authorization failure.
+
+Implement:
+
+- Configurable maximum retries.
+- Exponential backoff.
+- Retry limits.
+- Failure classification.
+- Retry history.
+- Retry timestamps.
+- Recovery verification.
+
+Do not retry every exception.
+
+A retry must not automatically repeat a side effect.
+
+### Recovery behaviour
+
+When a step fails:
+
+1. Capture the error.
+2. Persist its execution state.
+3. Classify the failure.
+4. Determine whether recovery is possible.
+5. Check whether the step's side effect already occurred.
+6. Retry only when safe.
+7. Verify the expected postcondition.
+8. Record the final result.
+
+The system must distinguish between:
+
+- Original execution failure.
+- Retry attempt.
+- Successful recovery.
+- Permanent failure.
+
+---
+
+# 8. Idempotency and duplicate side-effect prevention
+
+This is a critical engineering requirement.
+
+Demonstrate what happens when execution is interrupted immediately after an external side effect.
+
+Example:
+
+The browser submits an order.
+
+The application successfully creates the order, but the browser loses its connection before receiving confirmation.
+
+The execution engine sees a timeout.
+
+Blindly retrying the submit action could create another order.
+
+Prevent this.
+
+### Required design
+
+Implement an action execution ledger.
+
+Each side-effecting action should have:
+
+- Run ID.
+- Step ID.
+- Idempotency key.
+- Execution status.
+- Attempt number.
+- Side-effect reference, where available.
+- Verification status.
+- Timestamps.
+
+Generate a deterministic idempotency key using the run ID and step ID.
+
+The controlled demo application must support idempotent order creation through a server-side idempotency key.
+
+On recovery:
+
+1. Check the execution ledger.
+2. Inspect whether the original action was completed.
+3. Query the demo application's actual state.
+4. Verify whether the order exists.
+5. Reuse the existing result if the side effect already occurred.
+6. Retry only when it is safe to do so.
+
+Important engineering constraint:
+
+Do not claim exactly-once execution simply because an idempotency key exists.
+
+A browser action and an external application side effect cannot generally be made exactly-once through local database state alone.
+
+Demonstrate the distinction between:
+- At-least-once execution attempts.
+- Idempotent application operations.
+- Postcondition-based recovery.
+- Duplicate side-effect prevention.
+
+The demo must explicitly test the failure window where the side effect succeeds but its response is lost.
+
+---
+
+# 9. Persistent execution and crash recovery
+
+The system must survive process interruptions.
+
+Persist:
+
+- Test runs.
+- Scenario definitions.
+- Individual step execution states.
+- Retry attempts.
+- Failure information.
+- Idempotency records.
+- Browser execution metadata.
+- Evidence references.
+- Final evaluation results.
+
+### Recovery requirements
+
+Simulate:
+
+1. Start a workflow.
+2. Complete several steps.
+3. Terminate the execution worker.
+4. Restart the worker.
+5. Resume the workflow.
+6. Verify previously completed steps are not blindly repeated.
+7. Verify the final result.
+
+Implement safe worker recovery.
+
+Use database-backed execution state as the durable source of truth.
+
+Redis may be used for coordination, locks and short-lived execution metadata, but PostgreSQL must retain the durable execution history.
+
+Define and test behaviour when Redis becomes unavailable.
+
+Do not make Redis availability a prerequisite for retrieving persisted execution history.
+
+---
+
+# 10. Execution evidence and observability
+
+A QA result without evidence is not trustworthy.
+
+For every execution, capture:
+
+- Run ID.
+- Scenario ID.
+- Start and end time.
+- Step-level timestamps.
+- Step status.
+- Retry count.
+- Error details.
+- Browser console errors.
+- Failed network requests.
+- Screenshots.
+- Relevant execution logs.
+- Final assertions.
+
+Store screenshots and artifacts in a structured directory or storage abstraction.
+
+Do not store unnecessary screenshots or sensitive user information.
+
+### Execution timeline
+
+Example:
+
+    10:00:01 Browser launched
+    10:00:02 Login successful
+    10:00:04 Product search successful
+    10:00:06 Product added to cart
+    10:00:08 Checkout submitted
+    10:00:09 Network timeout
+    10:00:10 Failure classified as retryable
+    10:00:11 Existing order verified
+    10:00:11 Execution recovered
+
+The timeline must represent actual execution events, not hardcoded demo output.
+
+---
+
+# 11. Evaluation and reliability metrics
+
+Build an evaluation engine that calculates meaningful reliability metrics.
+
+Required metrics:
+
+**1. Task success rate**
+
+Percentage of completed test runs that satisfy their expected outcomes.
+
+**2. Recovery rate**
+
+Percentage of eligible failed executions that successfully recover.
+
+**3. Retry success rate**
+
+Percentage of retry attempts that result in verified successful execution.
+
+**4. Duplicate side-effect count**
+
+Number of duplicate external actions detected.
+
+**5. Mean execution duration**
+
+Average time taken to complete a scenario.
+
+**6. Failure distribution**
+
+Breakdown of failures by category.
+
+**7. Flaky test rate**
+
+Percentage of scenarios that produce inconsistent outcomes across repeated executions.
+
+**8. Assertion accuracy**
+
+Track whether the final system outcome matches independently verified application state.
+
+Do not fabricate metrics.
+
+Run actual repeated experiments.
+
+Make the sample size visible in the dashboard.
+
+A 100% success rate across five executions should not be presented as evidence of production-grade reliability.
+
+---
+
+# 12. Dashboard and user interface
+
+The UI is a supporting component, not the primary engineering objective.
+
+Build a clean developer-focused dashboard.
+
+Use a restrained dark theme with a professional testing-platform aesthetic.
+
+Avoid excessive animations, gradients, decorative cards and unnecessary visual complexity.
+
+### Page 1 — Overview
+
+Display:
+
+- Total test runs.
+- Successful runs.
+- Failed runs.
+- Recovered runs.
+- Retry count.
+- Duplicate side effects.
+- Overall task success rate.
+
+Include a failure distribution chart.
+
+### Page 2 — Scenarios
+
+Display available test scenarios.
+
+Allow the user to:
+
+- View scenario details.
+- Configure failure injection.
+- Configure retry limits.
+- Select execution environment.
+- Start a test run.
+
+### Page 3 — Execution details
+
+This is the most important UI page.
+
+Display:
+
+- Run status.
+- Scenario name.
+- Execution timeline.
+- Individual step status.
+- Retry attempts.
+- Failure information.
+- Screenshots.
+- Error details.
+- Verification results.
+
+### Page 4 — Reliability evaluation
+
+Display:
+
+- Success rate.
+- Recovery rate.
+- Retry success rate.
+- Duplicate action count.
+- Flaky test rate.
+- Execution duration.
+- Comparison across repeated test runs.
+
+### Page 5 — Failure laboratory
+
+Allow the user to deliberately inject failures and rerun scenarios.
+
+Show the difference between:
+
+- Normal execution.
+- Execution with failures.
+- Execution after recovery.
+
+All displayed data must come from the actual backend.
+
+No hardcoded statistics or fake activity.
+
+Use server-rendered templates initially. Do not waste time building an elaborate React application.
+
+---
+
+# 13. API design
+
+Implement clean REST APIs.
+
+Suggested endpoints:
+
+    POST   /api/scenarios
+    GET    /api/scenarios
+    GET    /api/scenarios/{scenario_id}
+
+    POST   /api/runs
+    GET    /api/runs
+    GET    /api/runs/{run_id}
+    POST   /api/runs/{run_id}/cancel
+    POST   /api/runs/{run_id}/resume
+
+    GET    /api/runs/{run_id}/steps
+    GET    /api/runs/{run_id}/timeline
+    GET    /api/runs/{run_id}/evidence
+
+    POST   /api/runs/{run_id}/inject-failure
+
+    GET    /api/evaluations
+    GET    /api/evaluations/{evaluation_id}
+
+Use:
+- Pydantic request and response schemas.
+- Correct HTTP status codes.
+- Input validation.
+- Consistent error responses.
+- Pagination where appropriate.
+- Structured logging.
+
+Do not expose internal database models directly through the API.
+
+---
+
+# 14. Database design
+
+Design the schema before implementation.
+
+Suggested entities:
+
+**Scenario**
+- id
+- name
+- description
+- configuration
+- created_at
+
+**TestRun**
+- id
+- scenario_id
+- status
+- started_at
+- completed_at
+- environment
+- total_steps
+
+**StepExecution**
+- id
+- run_id
+- step_id
+- status
+- attempt_number
+- started_at
+- completed_at
+- error_type
+- error_message
+- verification_result
+
+**ActionLedger**
+- id
+- run_id
+- step_id
+- idempotency_key
+- status
+- external_reference
+- verification_status
+
+**ExecutionEvent**
+- id
+- run_id
+- step_id
+- event_type
+- metadata
+- created_at
+
+**Evidence**
+- id
+- run_id
+- step_id
+- artifact_type
+- artifact_path
+- created_at
+
+**Evaluation**
+- id
+- scenario_id
+- sample_size
+- metrics
+- created_at
+
+Add appropriate:
+- Unique constraints.
+- Foreign keys.
+- Indexes.
+- Transactions.
+- Database migrations.
+
+Think carefully about concurrent execution and duplicate requests.
+
+Do not assume that application-level checks alone prevent database races.
+
+---
+
+# 15. Testing requirements
+
+Testing is a major deliverable, not an afterthought.
+
+Use Pytest.
+
+Implement unit tests, integration tests and end-to-end tests.
+
+### Essential test cases
+
+**Execution**
+- Normal workflow succeeds.
+- Invalid scenario is rejected.
+- Failed assertion marks the run correctly.
+- Completed steps are persisted.
+
+**Retries**
+- Transient failure triggers retry.
+- Permanent failure does not trigger retry.
+- Maximum retry limit is respected.
+- Backoff is applied correctly.
+
+**Idempotency**
+- Repeated execution request does not create duplicate runs.
+- Repeated action request does not create duplicate orders.
+- Successful side effect followed by lost response is recovered correctly.
+- Concurrent duplicate requests are handled safely.
+
+**Crash recovery**
+- Worker terminates after a completed step.
+- Worker restarts and resumes.
+- Previously completed side effects are not blindly repeated.
+- Interrupted execution can be inspected.
+
+**Infrastructure**
+- Redis outage.
+- PostgreSQL transaction rollback.
+- Browser process termination.
+- Worker restart.
+
+**Evaluation**
+- Metrics are calculated from actual records.
+- Failed runs are counted correctly.
+- Recovery metrics use the correct denominator.
+- Repeated executions produce meaningful reliability measurements.
+
+### Critical acceptance test
+
+The following must work:
+
+1. Start a purchase workflow.
+2. Successfully create an order in the demo application.
+3. Simulate losing the browser response after the order is created.
+4. Interrupt execution.
+5. Restart the execution worker.
+6. Resume the workflow.
+7. Verify the existing order.
+8. Complete the run without creating another order.
+
+The database must show one order, one verified side effect and a correctly recorded recovery.
+
+This is the project's most important demonstration.
+
+---
+
+# 16. Security and engineering quality
+
+Implement basic but genuine security practices.
+
+- Never hardcode credentials.
+- Use environment variables.
+- Provide an `.env.example`.
+- Validate scenario input.
+- Restrict browser navigation to the local demo application and explicitly allowed test domains.
+- Prevent arbitrary URL access and SSRF.
+- Avoid executing arbitrary Python code from scenarios.
+- Avoid exposing browser debugging endpoints publicly.
+- Use safe screenshot and artifact storage.
+- Prevent sensitive information from appearing in logs.
+- Apply sensible API request limits.
+- Handle exceptions explicitly.
+- Ensure temporary browser resources are cleaned up.
+
+The browser automation engine should not be capable of navigating arbitrary user-supplied external websites by default.
+
+---
+
+# 17. Project structure
+
+Use a structure similar to:
+
+    agent-reliability-lab/
+    |
+    ├── app/
+    │   ├── api/
+    │   ├── core/
+    │   ├── database/
+    │   ├── models/
+    │   ├── schemas/
+    │   ├── execution/
+    │   ├── browser/
+    │   ├── recovery/
+    │   ├── idempotency/
+    │   ├── failure_injection/
+    │   ├── evaluation/
+    │   ├── observability/
+    │   ├── templates/
+    │   └── static/
+    |
+    ├── demo_app/
+    │   ├── routes/
+    │   ├── models/
+    │   └── templates/
+    |
+    ├── scenarios/
+    ├── tests/
+    │   ├── unit/
+    │   ├── integration/
+    │   └── e2e/
+    |
+    ├── artifacts/
+    ├── migrations/
+    ├── scripts/
+    |
+    ├── docker-compose.yml
+    ├── Dockerfile
+    ├── pyproject.toml
+    ├── .env.example
+    ├── .gitignore
+    └── README.md
+
+You may modify this structure if you have a technically sound reason.
+
+Avoid creating dozens of unnecessary files.
+
+---
+
+# 18. Development methodology
+
+Build incrementally.
+
+Do not generate the entire application in one attempt.
+
+### Phase 0 — Research and architecture
+
+Before coding:
+
+1. Inspect the repository.
+2. Identify existing code and dependencies.
+3. Research publicly available Klarent product positioning.
+4. Identify the engineering problems this demonstration should address.
+5. Propose the system architecture.
+6. Identify failure modes.
+7. Design database entities and state transitions.
+8. Write a short implementation plan.
+9. Define acceptance tests.
+
+Do not invent Klarent's internal implementation or technical requirements.
+
+Stop and present the architecture for review before major implementation.
+
+### Phase 1 — Foundation
+
+- Set up FastAPI.
+- Configure PostgreSQL.
+- Configure Redis.
+- Add SQLAlchemy.
+- Add Alembic.
+- Configure Docker Compose.
+- Establish logging.
+- Create health checks.
+
+Deliverable: a working application foundation.
+
+### Phase 2 — Demo application
+
+- Build the minimal e-commerce application.
+- Implement login.
+- Implement product browsing.
+- Implement cart.
+- Implement checkout.
+- Implement idempotent order creation.
+- Add independent database verification.
+
+Deliverable: a functional controlled application to test.
+
+### Phase 3 — Execution engine
+
+- Define scenarios.
+- Implement step execution.
+- Integrate Playwright.
+- Add assertions.
+- Persist step states.
+- Implement execution events.
+
+Deliverable: successful execution of the initial browser scenarios.
+
+### Phase 4 — Reliability
+
+- Implement failure injection.
+- Implement failure classification.
+- Implement retry policies.
+- Implement idempotency.
+- Implement recovery.
+- Implement persistent execution.
+- Implement worker restart recovery.
+
+Deliverable: the interrupted-checkout acceptance test passes.
+
+### Phase 5 — Evaluation and observability
+
+- Capture execution evidence.
+- Implement structured logs.
+- Calculate reliability metrics.
+- Add repeated-run experiments.
+- Add failure categorization.
+
+Deliverable: measurable execution reliability.
+
+### Phase 6 — Dashboard
+
+- Overview.
+- Scenario management.
+- Execution timeline.
+- Failure laboratory.
+- Evaluation results.
+
+Deliverable: a usable developer dashboard.
+
+### Phase 7 — Hardening
+
+- Run all tests.
+- Test concurrency.
+- Test infrastructure outages.
+- Test resource cleanup.
+- Review security.
+- Fix edge cases.
+- Verify Docker startup from a clean environment.
+
+Deliverable: reproducible working application.
+
+### Phase 8 — Public demonstration
+
+Prepare:
+
+- Detailed README.
+- Architecture diagram.
+- Database diagram.
+- Example API requests.
+- Actual execution screenshots.
+- Failure recovery demonstration.
+- Benchmark methodology.
+- Known limitations.
+- Engineering trade-offs.
+- Short demonstration video.
+
+Deliverable: a GitHub repository that an engineering lead can inspect and run.
+
+---
+
+# 19. Strict rules for AI-assisted development
+
+I am using an agentic coding tool to accelerate implementation.
+
+You must act as an engineering partner, not an autonomous code generator that blindly produces files.
+
+Follow these rules:
+
+**Architecture**
+- Explain design decisions before major implementation.
+- Identify trade-offs.
+- Avoid unnecessary abstractions.
+- Prefer simple, maintainable Python.
+
+**Implementation**
+- Build one milestone at a time.
+- Keep the application runnable after each milestone.
+- Do not overwrite existing code without inspection.
+- Do not silently introduce new dependencies.
+- Do not implement unnecessary features.
+
+**Testing**
+- Write tests for critical behaviour.
+- Actually execute tests.
+- Never claim tests pass without execution evidence.
+- Investigate failures rather than weakening assertions.
+- Never remove a test merely because implementation fails.
+
+**Reliability**
+- Treat process crashes and network failures as normal engineering conditions.
+- Never confuse an HTTP success response with a verified business outcome.
+- Never assume browser actions are exactly-once.
+- Never hide duplicate side effects.
+- Never use hardcoded evaluation results.
+
+**Communication**
+After each milestone, report:
+1. What was implemented.
+2. What actually works.
+3. Tests executed and their results.
+4. Known bugs.
+5. Remaining work.
+6. Important architectural decisions.
+
+Stop at each major milestone and wait for my review before proceeding.
+
+Explain important implementation details in straightforward Python/backend engineering terms so I can understand and defend the project in an interview.
+
+---
+
+# 20. Definition of done
+
+The project is not complete merely because the dashboard loads or the browser can click buttons.
+
+It is complete only when:
+
+- [ ] The demo application works.
+- [ ] Playwright can execute predefined workflows.
+- [ ] Every execution step is tracked.
+- [ ] Failure injection is reproducible.
+- [ ] Retry policies distinguish transient and permanent failures.
+- [ ] Idempotency prevents duplicate business side effects in the controlled application.
+- [ ] A worker can restart after interruption.
+- [ ] Execution can recover from a lost response after a successful side effect.
+- [ ] PostgreSQL retains durable execution history.
+- [ ] Redis outage behaviour is tested.
+- [ ] Execution evidence is available.
+- [ ] Reliability metrics are calculated from real runs.
+- [ ] The dashboard displays real backend data.
+- [ ] Critical unit, integration and end-to-end tests pass.
+- [ ] Docker setup works from a clean checkout.
+- [ ] README explains architecture, limitations and how to reproduce the demonstrations.
+
+---
+
+# 21. Scope and time discipline
+
+Target implementation time: approximately 2–3 focused days for the initial demonstrable version, with further hardening only if necessary.
+
+Prioritize in this order:
+
+1. Execution engine.
+2. Failure injection.
+3. Retry and recovery.
+4. Idempotency.
+5. Persistent state.
+6. Automated testing.
+7. Evaluation.
+8. Dashboard polish.
+
+If time becomes limited, reduce the number of scenarios and UI features. Do not compromise the interrupted-side-effect recovery test.
+
+Do not introduce an LLM merely to make the project sound more agentic.
+
+The initial version should use deterministic, inspectable scenario execution. If the core reliability system is solid, consider adding a constrained natural-language scenario planner as a later extension, with validation and explicit action permissions.
+
+---
+
+# 22. Final product positioning
+
+The final project should communicate one clear engineering capability:
+
+**I understand that autonomous QA is not just about making an agent interact with an application. It is about ensuring that its actions, retries, recovery and final conclusions remain trustworthy when things go wrong.**
+
+Build for that outcome.
+
+Start with Phase 0. Inspect the repository, research the publicly available product context, propose the architecture and identify the highest-risk engineering decisions.
+
+Do not start generating the entire codebase immediately.
