@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Checkout</h1>
+{% for item in cart_items %}
+<div class="product">
+    <h3>{{ item.product.name }}</h3>
+    <p>Quantity: {{ item.quantity }} x ${{ item.product.price }}</p>
+</div>
+{% endfor %}
+<p><strong>Total: ${{ total }}</strong></p>
+<form id="checkoutForm">
+    <button type="submit">Submit Order</button>
+</form>
+<div id="result"></div>
+
+<script>
+document.getElementById('checkoutForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const idempotencyKey = crypto.randomUUID();
+    const response = await fetch('/demo/checkout/submit', {
+        method: 'POST',
+        headers: {
+            'Idempotency-Key': idempotencyKey
+        }
+    });
+    const data = await response.json();
+    document.getElementById('result').innerHTML = '<p>Order placed: ' + data.order_number + '</p>';
+});
+</script>
+{% endblock %}
