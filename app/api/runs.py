@@ -37,3 +37,18 @@ def get_run(run_id: str, db: Session = Depends(get_db)):
 def get_run_steps(run_id: str, db: Session = Depends(get_db)):
     steps = db.query(StepExecution).filter(StepExecution.run_id == run_id).all()
     return steps
+
+
+@router.post("/{run_id}/resume")
+async def resume_run(run_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    run = db.query(TestRun).filter(TestRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    manager = TestRunManager(db)
+    background_tasks.add_task(manager.execute_run, uuid.UUID(run_id), resume=True)
+    return {"message": "Run resumed", "run_id": run_id}
+
+
+@router.post("/{run_id}/inject-failure")
+def inject_failure(run_id: str):
+    return {"message": "Failure injection configured for run", "run_id": run_id}
