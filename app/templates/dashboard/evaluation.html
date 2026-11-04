@@ -1,0 +1,15 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+<h1>Reliability Evaluation</h1>
+<div class="card">
+    <h2>Metrics (from real data)</h2>
+    <p><strong>Sample Size:</strong> {{ metrics.sample_size }}</p>
+    <p><strong>Task Success Rate:</strong> {{ metrics.task_success_rate }}%</p>
+    <p><strong>Recovery Rate:</strong> {{ metrics.recovery_rate }}%</p>
+    <p><strong>Successful Runs:</strong> {{ metrics.successful_runs }}</p>
+    <p><strong>Failed Runs:</strong> {{ metrics.failed_runs }}</p>
+    <p><strong>Recovered Runs:</strong> {{ metrics.recovered_runs }}</p>
+    <p><strong>Mean Duration:</strong> {{ metrics.mean_execution_duration }}s</p>
+    <p><strong>Duplicate Side Effects:</strong> {{ metrics.duplicate_side_effect_count }}</p>
+</div>
+{% endblock %}

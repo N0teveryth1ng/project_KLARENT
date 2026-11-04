@@ -1,0 +1,28 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+<h1>Test Runs</h1>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Completed</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td><a href="/dashboard/runs/{{ run.id }}" style="color: #58a6ff;">{{ run.id[:8] }}</a></td>
+                <td><span class="status status-{{ run.status.lower() }}">{{ run.status }}</span></td>
+                <td>{{ run.started_at }}</td>
+                <td>{{ run.completed_at }}</td>
+                <td><a href="/dashboard/runs/{{ run.id }}"><button>View</button></a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

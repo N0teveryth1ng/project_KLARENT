@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Reliability Lab - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; background: #0d1117; color: #c9d1d9; }
+        nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 20px; }
+        nav ul { display: flex; list-style: none; }
+        nav li { padding: 15px 20px; }
+        nav a { color: #c9d1d9; text-decoration: none; }
+        nav a:hover { color: #58a6ff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 20px; margin-bottom: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 6px; }
+        .stat-value { font-size: 32px; font-weight: bold; color: #58a6ff; }
+        .stat-label { color: #8b949e; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
+        th { background: #0d1117; color: #8b949e; }
+        .status { padding: 4px 8px; border-radius: 3px; font-size: 12px; }
+        .status-passed { background: #238636; color: white; }
+        .status-failed { background: #da3633; color: white; }
+        .status-recovered { background: #1f6feb; color: white; }
+        .status-running { background: #9e6a03; color: white; }
+        button { background: #238636; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #2ea043; }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/dashboard/">Overview</a></li>
+            <li><a href="/dashboard/scenarios">Scenarios</a></li>
+            <li><a href="/dashboard/runs">Runs</a></li>
+            <li><a href="/dashboard/evaluation">Evaluation</a></li>
+            <li><a href="/dashboard/failure-lab">Failure Lab</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

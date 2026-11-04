@@ -5,10 +5,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     
     app_name: str = "agent-reliability-lab"
-    debug: bool = False
+    debug: bool = True
     secret_key: str = "change-me-in-production"
     
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/agent_reliability_lab"
+    database_url: str = "sqlite:///./test.db"
     postgres_user: str = "postgres"
     postgres_password: str = "postgres"
     postgres_db: str = "agent_reliability_lab"

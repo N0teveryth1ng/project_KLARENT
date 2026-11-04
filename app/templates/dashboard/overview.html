@@ -1,0 +1,31 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+<h1>Overview</h1>
+<div class="stats">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_runs }}</div>
+        <div class="stat-label">Total Runs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ successful }}</div>
+        <div class="stat-label">Successful</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ failed }}</div>
+        <div class="stat-label">Failed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ recovered }}</div>
+        <div class="stat-label">Recovered</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Reliability Metrics</h2>
+    <p>Task Success Rate: {{ metrics.task_success_rate }}%</p>
+    <p>Recovery Rate: {{ metrics.recovery_rate }}%</p>
+    <p>Duplicate Side Effects: {{ metrics.duplicate_side_effect_count }}</p>
+    <p>Mean Duration: {{ metrics.mean_execution_duration }}s</p>
+    <p>Sample Size: {{ metrics.sample_size }}</p>
+</div>
+{% endblock %}
