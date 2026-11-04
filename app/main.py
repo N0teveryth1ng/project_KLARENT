@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.api import health, scenarios, runs
+from app.api import health, scenarios, runs, evaluations
 from app.core.config import settings
 from demo_app.routes import auth, products, cart, checkout, orders
 
@@ -15,6 +15,7 @@ app = FastAPI(
 app.include_router(health.router, tags=["health"])
 app.include_router(scenarios.router, prefix="/api/scenarios", tags=["scenarios"])
 app.include_router(runs.router, prefix="/api/runs", tags=["runs"])
+app.include_router(evaluations.router, prefix="/api/evaluations", tags=["evaluations"])
 app.include_router(auth.router, prefix="/demo", tags=["demo-auth"])
 app.include_router(products.router, prefix="/demo/products", tags=["demo-products"])
 app.include_router(cart.router, prefix="/demo/cart", tags=["demo-cart"])
