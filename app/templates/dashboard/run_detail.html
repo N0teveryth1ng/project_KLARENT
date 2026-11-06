@@ -5,8 +5,10 @@
 <div class="card">
     <p><strong>Run ID:</strong> {{ run.id }}</p>
     <p><strong>Status:</strong> <span class="status status-{{ run.status.lower() }}">{{ run.status }}</span></p>
+    <p><strong>Steps passed:</strong> {{ run.passed_steps }}/{{ run.expected_steps }}</p>
     <p><strong>Started:</strong> {{ run.started_at }}</p>
     <p><strong>Completed:</strong> {{ run.completed_at }}</p>
+    {% if run.failure_summary %}<p class="failure-summary"><strong>Failure details:</strong> {{ run.failure_summary }}</p>{% endif %}
 </div>
 <div class="card">
     <h2>Steps</h2>

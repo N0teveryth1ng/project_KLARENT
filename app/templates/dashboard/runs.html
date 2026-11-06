@@ -7,20 +7,22 @@
         <thead>
             <tr>
                 <th>ID</th>
+                <th>Scenario</th>
                 <th>Status</th>
+                <th>Steps passed</th>
                 <th>Started</th>
-                <th>Completed</th>
-                <th>Actions</th>
+                <th>Result details</th>
             </tr>
         </thead>
         <tbody>
             {% for run in runs %}
             <tr>
                 <td><a href="/dashboard/runs/{{ run.id }}" style="color: #58a6ff;">{{ run.id }}</a></td>
+                <td>{{ run.scenario.name if run.scenario else "Scenario" }}</td>
                 <td><span class="status status-{{ run.status.lower() }}">{{ run.status }}</span></td>
-                <td>{{ run.started_at }}</td>
-                <td>{{ run.completed_at }}</td>
-                <td><a href="/dashboard/runs/{{ run.id }}"><button>View</button></a></td>
+                <td>{{ run.passed_steps }}/{{ run.expected_steps }}</td>
+                <td>{{ run.started_at or run.created_at }}</td>
+                <td>{{ run.failure_summary }}</td>
             </tr>
             {% endfor %}
         </tbody>

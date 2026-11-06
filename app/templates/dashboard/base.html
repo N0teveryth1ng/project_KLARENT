@@ -29,6 +29,16 @@
         .status-queued { background: #6e7681; color: white; }
         .status-interrupted { background: #8957e5; color: white; }
         .status-pending { background: #6e7681; color: white; }
+        .latest-run { border-color: #58a6ff; }
+        .latest-result { font-size: 28px; font-weight: 700; margin: 12px 0; color: #58a6ff; }
+        .failure-summary { margin-top: 12px; color: #ffb4ab; }
+        .evidence-unverified { color: #f0c674; }
+        .evidence-status { color: #f0c674; font-weight: 700; }
+        .evidence-passed { color: #3fb950; }
+        .evidence-failed { color: #ff7b72; }
+        .evidence-skipped, .evidence-not-recorded, .evidence-not-in-report { color: #f0c674; }
+        .muted { color: #8b949e; }
+        pre { overflow-x: auto; padding: 12px; background: #0d1117; border-radius: 6px; margin: 12px 0; }
         button { background: #238636; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
         button:hover { background: #2ea043; }
     </style>
@@ -40,7 +50,7 @@
             <li><a href="/dashboard/scenarios">Scenarios</a></li>
             <li><a href="/dashboard/runs">Runs</a></li>
             <li><a href="/dashboard/evaluation">Evaluation</a></li>
-            <li><a href="/dashboard/failure-lab">Failure Lab</a></li>
+            <li><a href="/dashboard/recovery-evidence">Recovery Evidence</a></li>
         </ul>
     </nav>
     <div class="container">

@@ -246,13 +246,21 @@ class TestRunManager:
                 if run.status == "RUNNING":
                     run.status = "FAILED"
                     run.completed_at = datetime.utcnow()
-                    if recovery_orchestrator:
-                        if recovery_orchestrator.fence_gate(run.id):
-                            self.db.commit()
-                        else:
-                            self.db.rollback()
-                    else:
+                run.run_metadata = {
+                    **(run.run_metadata or {}),
+                    "failure": {
+                        "phase": "browser_startup" if not run.step_executions else "step_execution",
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                    },
+                }
+                if recovery_orchestrator:
+                    if recovery_orchestrator.fence_gate(run.id):
                         self.db.commit()
+                    else:
+                        self.db.rollback()
+                else:
+                    self.db.commit()
             except Exception:
                 try:
                     self.db.rollback()
