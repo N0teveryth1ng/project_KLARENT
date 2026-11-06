@@ -1,5 +1,6 @@
 {% extends "dashboard/base.html" %}
 {% block content %}
+{% if run.status in ["QUEUED", "RUNNING"] %}<meta http-equiv="refresh" content="2">{% endif %}
 <h1>Run Details</h1>
 <div class="card">
     <p><strong>Run ID:</strong> {{ run.id }}</p>
@@ -7,4 +8,27 @@
     <p><strong>Started:</strong> {{ run.started_at }}</p>
     <p><strong>Completed:</strong> {{ run.completed_at }}</p>
 </div>
+<div class="card">
+    <h2>Steps</h2>
+    {% if steps %}
+    <table>
+        <thead><tr><th>Step</th><th>Status</th><th>Started</th><th>Error</th></tr></thead>
+        <tbody>
+            {% for step in steps %}
+            <tr>
+                <td>{{ step.step_id }}</td>
+                <td><span class="status status-{{ step.status.lower() }}">{{ step.status }}</span></td>
+                <td>{{ step.started_at or "" }}</td>
+                <td>{{ step.error_message or "" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% elif run.status in ["QUEUED", "RUNNING"] %}
+    <p>The browser test is running. Refresh this page in a moment for progress.</p>
+    {% else %}
+    <p>No step details were recorded.</p>
+    {% endif %}
+</div>
+<p><a href="/dashboard/runs">Back to runs</a></p>
 {% endblock %}
