@@ -1,56 +1,81 @@
 {% extends "dashboard/base.html" %}
 {% block content %}
-<h1>Overview</h1>
+<h1>Reliability Overview</h1>
+
+<div class="card latest-run">
+    <h2>Latest Run</h2>
+    {% if latest_run %}
+    <p class="latest-result">
+        {% if latest_run.status == "PASSED" %}
+            {{ latest_run.passed_steps }}/{{ latest_run.expected_steps }} steps passed
+        {% else %}
+            {{ latest_run.status }}
+        {% endif %}
+    </p>
+    <p>{{ latest_run.scenario.name if latest_run.scenario else "Scenario" }} · {{ latest_run.created_at }}</p>
+    <p><span class="status status-{{ latest_run.status.lower() }}">{{ latest_run.status }}</span>
+       <a href="/dashboard/runs/{{ latest_run.id }}">View run details</a></p>
+    {% if latest_run.failure_summary %}<p class="failure-summary">{{ latest_run.failure_summary }}</p>{% endif %}
+    {% else %}
+    <p>No runs have been recorded yet.</p>
+    {% endif %}
+</div>
+
 <div class="stats">
     <div class="stat-card">
-        <div class="stat-value">{{ total_runs }}</div>
-        <div class="stat-label">Total Runs</div>
+        <div class="stat-value">{{ normal_passed }}/{{ normal_completed }}</div>
+        <div class="stat-label">Normal Runs Passed</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value">{{ successful }}</div>
-        <div class="stat-label">Successful</div>
+        <div class="stat-value">{{ normal_passed / normal_completed * 100 if normal_completed else 0 }}%</div>
+        <div class="stat-label">Normal Execution Success</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value">{{ failed }}</div>
-        <div class="stat-label">Failed</div>
+        <div class="stat-value">{{ recovery_passed }}</div>
+        <div class="stat-label">Recovery-Configured Runs Passed/Recovered</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value">{{ recovered }}</div>
-        <div class="stat-label">Recovered</div>
+        <div class="stat-value">{{ recovery_test_evidence.tests | selectattr("result", "equalto", "PASSED") | list | length }}</div>
+        <div class="stat-label">Dedicated Recovery Tests Passed</div>
     </div>
 </div>
 
 <div class="card">
-    <h2>Reliability Metrics</h2>
-    <p>Task Success Rate: {{ metrics.task_success_rate }}%</p>
-    <p>Recovery Rate: {{ metrics.recovery_rate }}%</p>
-    <p>Duplicate Side Effects: {{ metrics.duplicate_side_effect_count }}</p>
-    <p>Mean Duration: {{ metrics.mean_execution_duration }}s</p>
-    <p>Sample Size: {{ metrics.sample_size }}</p>
+    <h2>Other execution metrics</h2>
+    <p>All recorded runs: {{ total_runs }}</p>
+    <p>Failed runs: {{ failed }}</p>
+    <p>Mean duration: {{ metrics.mean_execution_duration }}s</p>
+    <p>Action Ledger Side-Effect Records: {{ action_ledger_side_effect_records }}</p>
+    <p class="muted">This is a ledger record count, not a count of confirmed duplicate orders.</p>
 </div>
+
 <div class="card">
-    <h2>Run a test</h2>
-    <p>Load the included shopping demo, then start a real browser run from Scenarios.</p>
-    <a href="/dashboard/scenarios"><button type="button">Open scenarios</button></a>
+    <h2>Recovery evidence</h2>
+    {% if recovery_test_evidence.report_found %}
+    <p>Loaded dedicated PostgreSQL recovery test results from <code>artifacts/logs/recovery-tests.xml</code>.</p>
+    {% else %}
+    <p class="evidence-unverified">No dedicated recovery test report is recorded here. Recovery guarantees are not demonstrated by normal browser runs.</p>
+    {% endif %}
+    <a href="/dashboard/recovery-evidence">View recovery test evidence and status</a>
 </div>
+
 <div class="card">
-    <h2>Recent runs</h2>
+    <h2>Runs</h2>
     {% if recent_runs %}
     <table>
-        <thead><tr><th>Scenario</th><th>Status</th><th>Started</th><th></th></tr></thead>
+        <thead><tr><th>Created</th><th>Scenario</th><th>Status</th><th>Steps</th><th>Result details</th></tr></thead>
         <tbody>
             {% for run in recent_runs %}
             <tr>
+                <td>{{ run.created_at }}</td>
                 <td>{{ run.scenario.name if run.scenario else "Scenario" }}</td>
                 <td><span class="status status-{{ run.status.lower() }}">{{ run.status }}</span></td>
-                <td>{{ run.started_at or run.created_at or "" }}</td>
-                <td><a href="/dashboard/runs/{{ run.id }}">Details</a></td>
+                <td>{{ run.passed_steps }}/{{ run.expected_steps }}</td>
+                <td>{% if run.failure_summary %}{{ run.failure_summary }}{% else %}<a href="/dashboard/runs/{{ run.id }}">View steps</a>{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    {% else %}
-    <p>No test runs yet.</p>
-    {% endif %}
+    {% else %}<p>No runs recorded.</p>{% endif %}
 </div>
 {% endblock %}

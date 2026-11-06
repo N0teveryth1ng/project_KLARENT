@@ -1,15 +1,48 @@
 {% extends "dashboard/base.html" %}
 {% block content %}
-<h1>Reliability Evaluation</h1>
+<h1>Execution Evaluation</h1>
 <div class="card">
-    <h2>Metrics (from real data)</h2>
-    <p><strong>Sample Size:</strong> {{ metrics.sample_size }}</p>
-    <p><strong>Task Success Rate:</strong> {{ metrics.task_success_rate }}%</p>
-    <p><strong>Recovery Rate:</strong> {{ metrics.recovery_rate }}%</p>
-    <p><strong>Successful Runs:</strong> {{ metrics.successful_runs }}</p>
-    <p><strong>Failed Runs:</strong> {{ metrics.failed_runs }}</p>
-    <p><strong>Recovered Runs:</strong> {{ metrics.recovered_runs }}</p>
-    <p><strong>Mean Duration:</strong> {{ metrics.mean_execution_duration }}s</p>
-    <p><strong>Duplicate Side Effects:</strong> {{ metrics.duplicate_side_effect_count }}</p>
+    <h2>Normal browser execution</h2>
+    <p><strong>Successful:</strong> {{ normal_passed }} / {{ normal_completed }} completed normal runs</p>
+    <p><strong>Success rate:</strong> {{ normal_passed / normal_completed * 100 if normal_completed else 0 }}%</p>
+    <p>Runs with configured failure injection are excluded from this calculation.</p>
+</div>
+
+<div class="card">
+    <h2>Recovery outcomes recorded as runs</h2>
+    <p><strong>Recovery-configured or recovered runs:</strong> {{ recovery_runs | length }}</p>
+    <p><strong>Passed or marked RECOVERED:</strong> {{ recovery_passed }}</p>
+    <p><strong>Failed:</strong> {{ recovery_failed }}</p>
+    <p>These counts come from dashboard run records for scenarios with failure injection configured, or runs explicitly marked RECOVERED. They are separate from PostgreSQL recovery integration test evidence.</p>
+    <a href="/dashboard/recovery-evidence">View dedicated recovery-test evidence</a>
+</div>
+
+<div class="card">
+    <h2>Action and timing records</h2>
+    <p><strong>Sample size:</strong> {{ metrics.sample_size }} run records</p>
+    <p><strong>Mean duration:</strong> {{ metrics.mean_execution_duration }}s</p>
+    <p><strong>Action Ledger Side-Effect Records:</strong> {{ action_ledger_side_effect_records }}</p>
+    <p class="muted">The ledger count is not a measurement of confirmed duplicate orders.</p>
+</div>
+
+<div class="card">
+    <h2>Run history</h2>
+    {% if runs %}
+    <table>
+        <thead><tr><th>Created</th><th>Scenario</th><th>Status</th><th>Steps passed</th><th>Failure details</th><th></th></tr></thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td>{{ run.created_at }}</td>
+                <td>{{ run.scenario.name if run.scenario else "Scenario" }}</td>
+                <td><span class="status status-{{ run.status.lower() }}">{{ run.status }}</span></td>
+                <td>{{ run.passed_steps }}/{{ run.expected_steps }}</td>
+                <td>{{ run.failure_summary }}</td>
+                <td><a href="/dashboard/runs/{{ run.id }}">Details</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p>No run records yet.</p>{% endif %}
 </div>
 {% endblock %}
