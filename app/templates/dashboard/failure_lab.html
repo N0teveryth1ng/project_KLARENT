@@ -2,23 +2,7 @@
 {% block content %}
 <h1>Failure Laboratory</h1>
 <div class="card">
-    <h2>Inject Failures for Testing</h2>
-    <p>Deliberately inject failures and observe recovery behavior.</p>
-    <table>
-        <thead>
-            <tr>
-                <th>Scenario</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for scenario in scenarios %}
-            <tr>
-                <td>{{ scenario.name }}</td>
-                <td><button>Run with Failure Injection</button></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <h2>Failure injection is not available in the dashboard yet</h2>
+    <p>You can run the normal browser scenario from <a href="/dashboard/scenarios">Scenarios</a>. This page does not currently configure injected failures.</p>
 </div>
 {% endblock %}

@@ -2,23 +2,31 @@
 {% block content %}
 <h1>Scenarios</h1>
 <div class="card">
+    <h2>Get started</h2>
+    <p>Load the included local shopping demo scenario and its sample product and login. This only prepares local demo data.</p>
+    <form method="post" action="/dashboard/scenarios/prepare-demo">
+        <button type="submit">Prepare demo scenario</button>
+    </form>
+    {% if ready %}<p role="status">Demo scenario is ready. Select Run to start it.</p>{% endif %}
+</div>
+<div class="card">
+    <h2>Available scenarios</h2>
+    {% if scenarios %}
     <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Created</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Name</th><th>Description</th><th>Created</th><th>Action</th></tr></thead>
         <tbody>
             {% for scenario in scenarios %}
             <tr>
                 <td>{{ scenario.name }}</td>
-                <td>{{ scenario.description }}</td>
-                <td>{{ scenario.created_at }}</td>
+                <td>{{ scenario.description or "" }}</td>
+                <td>{{ scenario.created_at or "" }}</td>
+                <td><form method="post" action="/dashboard/scenarios/{{ scenario.id }}/run"><button type="submit">Run</button></form></td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    {% else %}
+    <p>No scenarios loaded yet. Choose “Prepare demo scenario” above.</p>
+    {% endif %}
 </div>
 {% endblock %}

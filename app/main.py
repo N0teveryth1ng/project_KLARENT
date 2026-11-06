@@ -4,7 +4,10 @@ from fastapi.templating import Jinja2Templates
 
 from app.api import health, scenarios, runs, evaluations, dashboard
 from app.core.config import settings
+from app.database.base import Base
+from app.database.session import engine
 from demo_app.routes import auth, products, cart, checkout, orders
+from app import models  # noqa: F401 - register all SQLAlchemy models before create_all
 
 app = FastAPI(
     title=settings.app_name,
@@ -22,6 +25,13 @@ app.include_router(products.router, prefix="/demo/products", tags=["demo-product
 app.include_router(cart.router, prefix="/demo/cart", tags=["demo-cart"])
 app.include_router(checkout.router, prefix="/demo/checkout", tags=["demo-checkout"])
 app.include_router(orders.router, prefix="/demo/orders", tags=["demo-orders"])
+
+
+@app.on_event("startup")
+def initialize_sqlite_schema():
+    """Create missing tables for the default local SQLite development database."""
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(bind=engine)
 
 # Mount static files
 try:

@@ -28,4 +28,29 @@
     <p>Mean Duration: {{ metrics.mean_execution_duration }}s</p>
     <p>Sample Size: {{ metrics.sample_size }}</p>
 </div>
+<div class="card">
+    <h2>Run a test</h2>
+    <p>Load the included shopping demo, then start a real browser run from Scenarios.</p>
+    <a href="/dashboard/scenarios"><button type="button">Open scenarios</button></a>
+</div>
+<div class="card">
+    <h2>Recent runs</h2>
+    {% if recent_runs %}
+    <table>
+        <thead><tr><th>Scenario</th><th>Status</th><th>Started</th><th></th></tr></thead>
+        <tbody>
+            {% for run in recent_runs %}
+            <tr>
+                <td>{{ run.scenario.name if run.scenario else "Scenario" }}</td>
+                <td><span class="status status-{{ run.status.lower() }}">{{ run.status }}</span></td>
+                <td>{{ run.started_at or run.created_at or "" }}</td>
+                <td><a href="/dashboard/runs/{{ run.id }}">Details</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No test runs yet.</p>
+    {% endif %}
+</div>
 {% endblock %}
