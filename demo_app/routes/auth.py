@@ -13,7 +13,7 @@ templates = Jinja2Templates(directory="demo_app/templates")
 
 @router.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="register.html", context={"request": request})
 
 
 @router.post("/register")
@@ -40,7 +40,7 @@ def register(
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="login.html", context={"request": request})
 
 
 @router.post("/login")

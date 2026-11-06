@@ -10,7 +10,10 @@ from app.database.base import Base
 from app import models  # noqa
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Prefer URL explicitly provided to Alembic config (e.g. test DB); fall back to app settings
+_ini_url = config.get_main_option("sqlalchemy.url")
+if not _ini_url or _ini_url.startswith("driver://"):
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

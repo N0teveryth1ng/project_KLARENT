@@ -19,7 +19,7 @@ def cart_page(request: Request, db: Session = Depends(get_db)):
     
     cart_items = db.query(CartItem).filter(CartItem.user_id == user_id).all()
     total = sum(item.product.price * item.quantity for item in cart_items)
-    return templates.TemplateResponse("cart.html", {"request": request, "cart_items": cart_items, "total": total})
+    return templates.TemplateResponse(request=request, name="cart.html", context={"request": request, "cart_items": cart_items, "total": total})
 
 
 @router.post("/add")

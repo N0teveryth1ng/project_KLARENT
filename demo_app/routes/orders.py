@@ -17,4 +17,4 @@ def orders_page(request: Request, db: Session = Depends(get_db)):
         return HTMLResponse("Not logged in", status_code=401)
     
     orders = db.query(Order).filter(Order.user_id == user_id).order_by(Order.created_at.desc()).all()
-    return templates.TemplateResponse("orders.html", {"request": request, "orders": orders})
+    return templates.TemplateResponse(request=request, name="orders.html", context={"request": request, "orders": orders})

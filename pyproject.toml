@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "agent-reliability-lab"
 version = "0.1.0"
 description = "Agent QA Reliability & Recovery Platform"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
@@ -36,3 +36,11 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app", "demo_app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+markers = [
+    "pg: tests that require a dedicated PostgreSQL test database (TEST_DATABASE_URL)",
+]
