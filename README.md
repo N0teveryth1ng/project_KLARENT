@@ -60,6 +60,34 @@ The included scenario runs only against this project's local demo shop; it does 
 
 Overview highlights the latest run and its passed-step count. The **Runs** page retains both passed and failed attempts, including the failure details when available. An older failed run with no saved exception is identified as historical and is not removed from the success-rate calculation.
 
+## Dashboard Screenshots
+
+These screenshots were captured from the local dashboard. They show the saved local run history at capture time; they are illustrative evidence of the UI and recorded results, not proof of recovery guarantees.
+
+### Overview
+
+![Reliability dashboard overview](artifacts/screenshots/readme/overview.png)
+
+### Scenarios
+
+![Available scenarios and demo setup](artifacts/screenshots/readme/scenarios.png)
+
+### Runs
+
+![Recorded run history](artifacts/screenshots/readme/runs.png)
+
+### Run details
+
+![Recorded browser step results](artifacts/screenshots/readme/run-details.png)
+
+### Evaluation
+
+![Execution evaluation metrics](artifacts/screenshots/readme/evaluation.png)
+
+### Recovery evidence
+
+![Dedicated recovery-test evidence status](artifacts/screenshots/readme/recovery-evidence.png)
+
 ## Progress Snapshot (2026-11-06)
 
 - The latest dashboard purchase run passed all **16/16** configured browser steps against the local demo shop.
